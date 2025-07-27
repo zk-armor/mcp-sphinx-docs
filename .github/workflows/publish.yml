@@ -49,11 +49,11 @@ jobs:
     - name: Install dependencies
       run: npm ci
 
-    - name: Run tests
-      run: npm test
-
     - name: Build project
       run: npm run build
+
+    - name: Run tests
+      run: npm test
 
     - name: Determine version and publish type
       id: version
@@ -65,7 +65,8 @@ jobs:
         elif [[ "${{ github.ref }}" == refs/tags/release* ]] || [[ "${{ github.ref }}" == refs/tags/v* ]]; then
           PUBLISH_TYPE="release"
         else
-          PUBLISH_TYPE="beta"
+          echo "No matching tag found, exiting."
+          exit 1
         fi
         
         echo "publish_type=$PUBLISH_TYPE" >> $GITHUB_OUTPUT
