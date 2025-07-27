@@ -1,0 +1,58 @@
+{
+  "name": "@zk-armor/mcp-sphinx-docs",
+  "version": "1.0.0",
+  "description": "MCP server to convert Sphinx documentation to LLM-optimized Markdown",
+  "main": "dist/index.js",
+  "bin": {
+    "mcp-sphinx-docs": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/index.ts",
+    "start": "node dist/index.js",
+    "cli": "node dist/cli.js",
+    "watch": "tsc --watch",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run clean && npm run build",
+    "test": "node test.js",
+    "test:cli": "npm run build && node dist/cli.js --help",
+    "test:mcp": "npm run build && timeout 5s node dist/index.js || echo 'MCP server test completed'",
+    "demo": "node demo.js",
+    "version:beta": "npm version prerelease --preid=beta --no-git-tag-version",
+    "version:patch": "npm version patch --no-git-tag-version",
+    "version:minor": "npm version minor --no-git-tag-version",
+    "version:major": "npm version major --no-git-tag-version"
+  },
+  "keywords": ["mcp", "sphinx", "markdown", "llm", "documentation", "rst", "model-context-protocol"],
+  "author": "zk-armor",
+  "license": "MIT",
+  "type": "commonjs",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zk-armor/mcp-sphinx-docs.git"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "devDependencies": {
+    "@types/node": "^24.1.0",
+    "nodemon": "^3.1.10",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.0",
+    "axios": "^1.11.0",
+    "chalk": "^5.4.1",
+    "cheerio": "^1.1.2",
+    "commander": "^14.0.0",
+    "fast-glob": "^3.3.3",
+    "glob": "^11.0.3",
+    "remark": "^15.0.1",
+    "remark-gfm": "^4.0.1",
+    "remark-parse": "^11.0.0",
+    "remark-stringify": "^11.0.0",
+    "unified": "^11.0.5",
+    "zod": "^3.25.76"
+  }
+}

@@ -1,0 +1,168 @@
+name: Build and Publish
+
+on:
+  push:
+    tags:
+      - 'beta*'
+      - 'release*'
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      publish_type:
+        description: 'Publish type'
+        required: true
+        default: 'beta'
+        type: choice
+        options:
+          - beta
+          - release
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        registry-url: 'https://npm.pkg.github.com'
+        scope: '@zk-armor'
+
+    - name: Cache node modules
+      uses: actions/cache@v3
+      with:
+        path: ~/.npm
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run tests
+      run: npm test
+
+    - name: Build project
+      run: npm run build
+
+    - name: Determine version and publish type
+      id: version
+      run: |
+        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          PUBLISH_TYPE="${{ github.event.inputs.publish_type }}"
+        elif [[ "${{ github.ref }}" == refs/tags/beta* ]]; then
+          PUBLISH_TYPE="beta"
+        elif [[ "${{ github.ref }}" == refs/tags/release* ]] || [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+          PUBLISH_TYPE="release"
+        else
+          PUBLISH_TYPE="beta"
+        fi
+        
+        echo "publish_type=$PUBLISH_TYPE" >> $GITHUB_OUTPUT
+        
+        # Get current version from package.json
+        CURRENT_VERSION=$(node -p "require('./package.json').version")
+        
+        if [[ "$PUBLISH_TYPE" == "beta" ]]; then
+          # Generate beta version with timestamp
+          TIMESTAMP=$(date +%Y%m%d%H%M%S)
+          NEW_VERSION="${CURRENT_VERSION}-beta.${TIMESTAMP}"
+          DIST_TAG="beta"
+        else
+          NEW_VERSION="$CURRENT_VERSION"
+          DIST_TAG="latest"
+        fi
+        
+        echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+        echo "dist_tag=$DIST_TAG" >> $GITHUB_OUTPUT
+        
+        echo "Publishing as: $NEW_VERSION with tag: $DIST_TAG"
+
+    - name: Update package.json version
+      run: |
+        npm version ${{ steps.version.outputs.version }} --no-git-tag-version
+
+    - name: Create .npmrc for GitHub Packages
+      run: |
+        echo "@zk-armor:registry=https://npm.pkg.github.com" > .npmrc
+        echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" >> .npmrc
+
+    - name: Publish to GitHub Packages
+      run: |
+        if [[ "${{ steps.version.outputs.publish_type }}" == "beta" ]]; then
+          npm publish --tag ${{ steps.version.outputs.dist_tag }}
+        else
+          npm publish --tag ${{ steps.version.outputs.dist_tag }}
+        fi
+      env:
+        NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Create GitHub Release
+      if: steps.version.outputs.publish_type == 'release'
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref_name }}
+        release_name: Release ${{ steps.version.outputs.version }}
+        body: |
+          ## Changes
+          
+          🚀 **MCP Sphinx Docs v${{ steps.version.outputs.version }}**
+          
+          ### Installation
+          ```bash
+          npx @zk-armor/mcp-sphinx-docs convert-url <sphinx-url> <output-dir>
+          ```
+          
+          ### MCP Client Configuration
+          ```json
+          {
+            "mcpServers": {
+              "mcp-sphinx-docs": {
+                "command": "npx",
+                "args": ["@zk-armor/mcp-sphinx-docs"]
+              }
+            }
+          }
+          ```
+          
+          ### Features
+          - ✅ Convert Sphinx documentation from URLs
+          - ✅ Convert local RST files to Markdown
+          - ✅ LLM-optimized output
+          - ✅ MCP server for interactive use
+          
+          See [README.md](https://github.com/zk-armor/mcp-sphinx-docs/blob/main/README.md) for full documentation.
+        draft: false
+        prerelease: false
+
+    - name: Summary
+      run: |
+        echo "## 🎉 Publication Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- **Package**: @zk-armor/mcp-sphinx-docs" >> $GITHUB_STEP_SUMMARY
+        echo "- **Version**: ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Type**: ${{ steps.version.outputs.publish_type }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Tag**: ${{ steps.version.outputs.dist_tag }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📦 Usage" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+        echo "# CLI Usage" >> $GITHUB_STEP_SUMMARY
+        echo "npx @zk-armor/mcp-sphinx-docs convert-url https://docs.example.com ./output" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "# MCP Server" >> $GITHUB_STEP_SUMMARY
+        echo "# Add to claude_desktop_config.json:" >> $GITHUB_STEP_SUMMARY
+        echo '# "mcp-sphinx-docs": {"command": "npx", "args": ["@zk-armor/mcp-sphinx-docs"]}' >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

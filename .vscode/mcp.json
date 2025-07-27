@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "mcp-sphinx-docs": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["@zk-armor/mcp-sphinx-docs"]
+    }
+  }
+}
